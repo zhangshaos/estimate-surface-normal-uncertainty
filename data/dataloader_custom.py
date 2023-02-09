@@ -1,4 +1,6 @@
 import glob
+import os.path
+
 import numpy as np
 from PIL import Image
 
@@ -35,7 +37,8 @@ class CustomLoadPreprocess(Dataset):
         img = torch.from_numpy(img).permute(2, 0, 1)
         img = self.normalize(img)
 
-        img_name = img_path.split('/')[-1]
+        #img_name = img_path.split('/')[-1]
+        img_name = os.path.basename(img_path)
         img_name = img_name.split('.png')[0] if '.png' in img_name else img_name.split('.jpg')[0]
 
         sample = {'img': img,

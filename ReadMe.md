@@ -11,7 +11,7 @@ Official implementation of the paper
 > [[arXiv]](https://arxiv.org/abs/2109.09881) [[youtube]](https://youtu.be/mTy85tJ2oAQ)
 
 <p align="center">
-  <img width=70% src="https://github.com/baegwangbin/surface_normal_uncertainty/blob/main/figs/readme_scannet.png?raw=true">
+  <img width=70% src="./figs/readme_scannet.png?raw=true">
 </p>
 
 The proposed method estimates the per-pixel surface normal probability distribution, from which the expected angular error can be inferred to quantify the aleatoric uncertainty. 
@@ -63,7 +63,7 @@ python test.py --pretrained scannet --architecture BN
 Running the above will save the predicted surface normal and uncertainty under `./examples/results/`. If successful, you will obtain images like below.
 
 <p align="center">
-  <img width=100% src="https://github.com/baegwangbin/surface_normal_uncertainty/blob/main/figs/readme_generalize.png?raw=true">
+  <img width=100% src="./figs/readme_generalize.png?raw=true">
 </p>
 
 The predictions in the figure above are obtained by the network trained only on ScanNet. The network generalizes well to objects unseen during training (e.g., humans, cars, animals). The last row shows interesting examples where the input image only contains edges.

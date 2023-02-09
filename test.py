@@ -68,6 +68,18 @@ def test(model, test_loader, device, results_dir):
             utils.concat_image(image_path_list, target_path)
 
 
+def resize_img():
+    import cv2
+    for i in [1, 18, 55, 99]:
+        img = cv2.imread(f'./examples/{i}_scene.png', cv2.IMREAD_COLOR)
+        img = cv2.resize(img, dsize=(1440, 1080), interpolation=cv2.INTER_LINEAR)
+        img = cv2.resize(img, dsize=(1080, 1080), interpolation=cv2.INTER_LINEAR)
+        img = cv2.resize(img, dsize=(960, 720), interpolation=cv2.INTER_LINEAR)
+        img = cv2.resize(img, dsize=(640, 480), interpolation=cv2.INTER_LINEAR)
+        cv2.imwrite(f'./examples/{i}_scene.png', img)
+    pass
+
+
 if __name__ == '__main__':
     # Arguments ########################################################################################################
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@', conflict_handler='resolve')
