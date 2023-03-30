@@ -7,63 +7,77 @@ from tqdm import tqdm
 import torch
 import torch.nn.functional as F
 
-from data.dataloader_sz import SZLoader
+from data.dataloader_custom import CustomLoader
 from models.NNET import NNET
 import utils.utils as utils
 
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from PIL import Image
 
 
-def test(model, test_loader, device, results_dir, gen_torch_script=False):
-    alpha_max = 90
+def test(model, test_loader, device, results_dir):
+    alpha_max = 60
+    kappa_max = 30
 
     with torch.no_grad():
         for data_dict in tqdm(test_loader):
 
             img = data_dict['img'].to(device)
-
-            # 尝试导出torch_script版本，供c++调用
-            if gen_torch_script:
-                traced_script = torch.jit.trace(model, img)
-                norm_out_list, _, _ = traced_script(img)
-                norm_out = norm_out_list[-1]
-                traced_script.save('nnet.pt')
-                gen_torch_script = False
-            else:
-                norm_out_list, _, _ = model(img)
-                norm_out = norm_out_list[-1]
+            norm_out_list, _, _ = model(img)
+            norm_out = norm_out_list[-1]
 
             pred_norm = norm_out[:, :3, :, :]
             pred_kappa = norm_out[:, 3:, :, :]
 
             # to numpy arrays
+            img = img.detach().cpu().permute(0, 2, 3, 1).numpy()                    # (B, H, W, 3)
             pred_norm = pred_norm.detach().cpu().permute(0, 2, 3, 1).numpy()        # (B, H, W, 3)
             pred_kappa = pred_kappa.cpu().permute(0, 2, 3, 1).numpy()
 
             # save results
-            img_name = os.path.basename(data_dict['img_name'][0]).replace('.png','')
+            img_name = data_dict['img_name'][0]
+
+            # 1. save input image
+            img = utils.unnormalize(img[0, ...])
+
+            target_path = '%s/%s_img.png' % (results_dir, img_name)
+            plt.imsave(target_path, img)
 
             # 2. predicted normal
             pred_norm_rgb = ((pred_norm + 1) * 0.5) * 255
             pred_norm_rgb = np.clip(pred_norm_rgb, a_min=0, a_max=255)
-            # 模型使用左x，上y，后z左手坐标系，将其转换为右x，下y，前z相机坐标系
-            pred_norm_rgb *= -1
             pred_norm_rgb = pred_norm_rgb.astype(np.uint8)  # (B, H, W, 3)
 
-            target_path = f'{results_dir}/{img_name}_pred_norm.png'
+            target_path = '%s/%s_pred_norm.png' % (results_dir, img_name)
             plt.imsave(target_path, pred_norm_rgb[0, :, :, :])
+
+            # 3. predicted kappa (concentration parameter)
+            target_path = '%s/%s_pred_kappa.png' % (results_dir, img_name)
+            plt.imsave(target_path, pred_kappa[0, :, :, 0], vmin=0.0, vmax=kappa_max, cmap='gray')
 
             # 4. predicted uncertainty
             pred_alpha = utils.kappa_to_alpha(pred_kappa)
-            pred_alpha = np.clip(pred_alpha, 0, alpha_max)
-            pred_alpha_gray = (pred_alpha * (255 / 90)).astype(np.uint8)
+            target_path = '%s/%s_pred_alpha.png' % (results_dir, img_name)
+            plt.imsave(target_path, pred_alpha[0, :, :, 0], vmin=0.0, vmax=alpha_max, cmap='jet')
 
-            target_path = f'{results_dir}/{img_name}_pred_alpha.png'
-            #plt.imsave(target_path, pred_alpha_gray[0, :, :, 0], cmap='gray')
-            Image.fromarray(pred_alpha_gray[0, :, :, 0]).save(target_path)
+            # 5. concatenated results
+            image_path_list = ['img', 'pred_norm', 'pred_alpha']
+            image_path_list = ['%s/%s_%s.png' % (results_dir, img_name, i) for i in image_path_list]
+            target_path = '%s/%s_concat.png' % (results_dir, img_name)
+            utils.concat_image(image_path_list, target_path)
+
+
+def resize_img():
+    import cv2
+    for i in [1, 18, 55, 99]:
+        img = cv2.imread(f'./examples/{i}_scene.png', cv2.IMREAD_COLOR)
+        img = cv2.resize(img, dsize=(1440, 1080), interpolation=cv2.INTER_LINEAR)
+        img = cv2.resize(img, dsize=(1080, 1080), interpolation=cv2.INTER_LINEAR)
+        img = cv2.resize(img, dsize=(960, 720), interpolation=cv2.INTER_LINEAR)
+        img = cv2.resize(img, dsize=(640, 480), interpolation=cv2.INTER_LINEAR)
+        cv2.imwrite(f'./examples/{i}_scene.png', img)
+    pass
 
 
 if __name__ == '__main__':
@@ -72,12 +86,12 @@ if __name__ == '__main__':
     parser.convert_arg_line_to_args = utils.convert_arg_line_to_args
 
     parser.add_argument('--architecture', required=True, type=str, help='{BN, GN}')
-    parser.add_argument("--pretrained", required=True, type=str, help="{pretrained model path}")
+    parser.add_argument("--pretrained", required=True, type=str, help="{nyu, scannet}")
     parser.add_argument('--sampling_ratio', type=float, default=0.4)
     parser.add_argument('--importance_ratio', type=float, default=0.7)
     parser.add_argument('--input_height', default=480, type=int)
     parser.add_argument('--input_width', default=640, type=int)
-    parser.add_argument('--imgs_dir', required=True, type=str)
+    parser.add_argument('--imgs_dir', default='./examples', type=str)
 
     # read arguments from txt file
     if sys.argv.__len__() == 2 and '.txt' in sys.argv[1]:
@@ -89,16 +103,16 @@ if __name__ == '__main__':
     device = torch.device('cuda:0')
 
     # load checkpoint
-    checkpoint = args.pretrained
-    print(f'loading checkpoint... {checkpoint}')
+    checkpoint = './checkpoints/%s.pt' % args.pretrained
+    print('loading checkpoint... {}'.format(checkpoint))
     model = NNET(args).to(device)
     model = utils.load_checkpoint(checkpoint, model)
     model.eval()
     print('loading checkpoint... / done')
 
     # test the model
-    results_dir = f'{args.imgs_dir}/results'
+    results_dir = args.imgs_dir + '/results'
     os.makedirs(results_dir, exist_ok=True)
-    test_loader = SZLoader(args, 'test').data
+    test_loader = CustomLoader(args, args.imgs_dir).data
     test(model, test_loader, device, results_dir)
 

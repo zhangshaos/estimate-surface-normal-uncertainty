@@ -5,4 +5,9 @@ __pycache__/
 
 checkpoints/
 examples/
+data_split/**
+experiments/
 
+t_img.png
+t_norm.png
+t_mask.png

@@ -123,7 +123,7 @@ def unnormalize(img_in):
 def kappa_to_alpha(pred_kappa):
     alpha = ((2 * pred_kappa) / ((pred_kappa ** 2.0) + 1)) \
             + ((np.exp(- pred_kappa * np.pi) * np.pi) / (1 + np.exp(- pred_kappa * np.pi)))
-    alpha = np.degrees(alpha)
+    alpha = np.degrees(alpha) #误差期望，用角度值表示，大小属于[0,pi]
     return alpha
 
 
