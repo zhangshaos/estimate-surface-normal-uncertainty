@@ -17,25 +17,15 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 
-def test(model, test_loader, device, results_dir, gen_torch_script=False):
+def test(model, test_loader, device, results_dir):
     alpha_max = 90
 
     with torch.no_grad():
         for data_dict in tqdm(test_loader):
 
             img = data_dict['img'].to(device)
-
-            # 尝试导出torch_script版本，供c++调用
-            if gen_torch_script:
-                traced_script = torch.jit.trace(model, img)
-                norm_out_list, _, _ = traced_script(img)
-                norm_out = norm_out_list[-1]
-                traced_script.save('nnet.pt')
-                gen_torch_script = False
-            else:
-                norm_out_list, _, _ = model(img)
-                norm_out = norm_out_list[-1]
-
+            norm_out_list, _, _ = model(img)
+            norm_out = norm_out_list[-1]
             pred_norm = norm_out[:, :3, :, :]
             pred_kappa = norm_out[:, 3:, :, :]
 
@@ -47,10 +37,10 @@ def test(model, test_loader, device, results_dir, gen_torch_script=False):
             img_name = os.path.basename(data_dict['img_name'][0]).replace('.png','')
 
             # 2. predicted normal
+            # 模型使用左x，上y，后z左手坐标系，将其转换为右x，下y，前z相机坐标系
+            pred_norm *= -1
             pred_norm_rgb = ((pred_norm + 1) * 0.5) * 255
             pred_norm_rgb = np.clip(pred_norm_rgb, a_min=0, a_max=255)
-            # 模型使用左x，上y，后z左手坐标系，将其转换为右x，下y，前z相机坐标系
-            pred_norm_rgb *= -1
             pred_norm_rgb = pred_norm_rgb.astype(np.uint8)  # (B, H, W, 3)
 
             target_path = f'{results_dir}/{img_name}_pred_norm.png'

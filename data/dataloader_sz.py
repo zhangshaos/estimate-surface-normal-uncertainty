@@ -150,15 +150,15 @@ class SZDataset(Dataset):
         return sample
 
 
+#图片预处理：放缩图片、并将图片复制到指定目录下
 def preprocess(srcDir: str, destDir: str, width=640, height=480):
-    """图片预处理：放缩图片、并将图片复制到指定目录下"""
     assert os.path.exists(srcDir)
     if os.path.exists(destDir):
         shutil.rmtree(destDir, ignore_errors=True)
     os.makedirs(destDir)
     cameraFile = f'{srcDir}/cameras.txt'
-    assert os.path.exists(cameraFile)
-    shutil.copy(cameraFile, destDir)
+    if os.path.exists(cameraFile):
+        shutil.copy(cameraFile, destDir)
     i = 0
     while True:
         scene   = f'{srcDir}/{i}_scene.png'

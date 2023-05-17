@@ -1,3 +1,5 @@
+import time
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -59,6 +61,8 @@ class Decoder(nn.Module):
     def forward(self, features, gt_norm_mask=None, mode='test'):
         x_block0, x_block1, x_block2, x_block3, x_block4 = features[4], features[5], features[6], features[8], features[11]
 
+        t0 = time.time_ns()
+
         # generate feature-map
 
         x_d0 = self.conv2(x_block4)                     # x_d0 : [2, 2048, 15, 20]      1/32 res
@@ -111,7 +115,7 @@ class Decoder(nn.Module):
             out_res4 = self.out_conv_res4(feat_map.view(B, 512 + 4, -1))  # (B, 4, N)
             out_res4 = norm_normalize(out_res4)  # (B, 4, N) - normalized
             out_res4 = out_res4.view(B, 4, H, W)
-            samples_pred_res4 = point_coords_res4 = None
+            samples_pred_res4 = point_coords_res4 = torch.empty(0) #None
 
         ################################################################################################################
         # out_res2
@@ -153,7 +157,7 @@ class Decoder(nn.Module):
             out_res2 = self.out_conv_res2(feat_map.view(B, 256 + 4, -1))  # (B, 4, N)
             out_res2 = norm_normalize(out_res2)  # (B, 4, N) - normalized
             out_res2 = out_res2.view(B, 4, H, W)
-            samples_pred_res2 = point_coords_res2 = None
+            samples_pred_res2 = point_coords_res2 = torch.empty(0) #None
 
         ################################################################################################################
         # out_res1
@@ -194,9 +198,12 @@ class Decoder(nn.Module):
             out_res1 = self.out_conv_res1(feat_map.view(B, 128 + 4, -1))  # (B, 4, N)
             out_res1 = norm_normalize(out_res1)  # (B, 4, N) - normalized
             out_res1 = out_res1.view(B, 4, H, W)
-            samples_pred_res1 = point_coords_res1 = None
+            samples_pred_res1 = point_coords_res1 = torch.empty(0) #None
 
-        return [out_res8, out_res4, out_res2, out_res1], \
-               [out_res8, samples_pred_res4, samples_pred_res2, samples_pred_res1], \
-               [None, point_coords_res4, point_coords_res2, point_coords_res1]
+        t1 = time.time_ns()
+        print(f'decoder cost {(t1 - t0) * 1e-6} millisecond.')
+
+        return (out_res8, out_res4, out_res2, out_res1), \
+               (out_res8, samples_pred_res4, samples_pred_res2, samples_pred_res1), \
+               (torch.empty(0), point_coords_res4, point_coords_res2, point_coords_res1)
 

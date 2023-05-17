@@ -16,3 +16,8 @@
 
 `test.py --pretrained [path to model weights] --architecture BN --imgs_dir [path to test data]`
 
+## 导出onnx模型
+
+`export_onnx.py --pretrained [path to model weights] --architecture BN --imgs_dir [path to test data] --export_onnx`
+> 测试导出后onnx推理功能：  
+> `export_onnx.py --pretrained [path to model weights] --architecture BN --imgs_dir [path to test data]`

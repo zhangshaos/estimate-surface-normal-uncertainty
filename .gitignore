@@ -11,3 +11,6 @@ experiments/
 t_img.png
 t_norm.png
 t_mask.png
+*.pt
+*.onnx
+onnxruntime_profile_*

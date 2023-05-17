@@ -91,7 +91,7 @@ class compute_loss(nn.Module):
     def forward_UG(self, pred_list, coord_list, gt_norm, gt_norm_mask):
         loss = 0.0
         for (pred, coord) in zip(pred_list, coord_list):
-            if coord is None:
+            if coord is None or coord.shape[0] == 0:
                 pred = F.interpolate(pred, size=[gt_norm.size(2), gt_norm.size(3)], mode='bilinear', align_corners=True)
                 pred_norm, pred_kappa = pred[:, 0:3, :, :], pred[:, 3:, :, :]
 
