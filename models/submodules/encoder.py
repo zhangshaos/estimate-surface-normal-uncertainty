@@ -6,11 +6,10 @@ import torch.nn.functional as F
 
 
 class Encoder(nn.Module):
-    def __init__(self):
+    def __init__(self, basemodel_name='tf_efficientnet_b5_ap'):
         super(Encoder, self).__init__()
 
-        basemodel_name = 'tf_efficientnet_b5_ap'
-        print('Loading base model ()...'.format(basemodel_name), end='')
+        print(f'Loading base model ({basemodel_name})...')
         basemodel = torch.hub.load('rwightman/gen-efficientnet-pytorch',
                                    basemodel_name,
                                    pretrained=True)
@@ -25,15 +24,12 @@ class Encoder(nn.Module):
 
     def forward(self, x):
         features = [x]
-        t0 = time.time_ns()
         for k, v in self.original_model._modules.items():
-            if (k == 'blocks'):
+            if k == 'blocks':
                 for ki, vi in v._modules.items():
                     features.append(vi(features[-1]))
             else:
                 features.append(v(features[-1]))
-        t1 = time.time_ns()
-        print(f'encoder cost {(t1 - t0) * 1e-6} millisecond.')
         return features
 
 

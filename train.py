@@ -11,8 +11,8 @@ import torch.optim as optim
 import torch.utils.data.distributed
 from torch.utils.tensorboard import SummaryWriter
 
-import utils.utils as utils
-from utils.losses import compute_loss
+import mainly_utils.utils as utils
+from mainly_utils.losses import compute_loss
 
 
 def train(model, args, device):
@@ -30,6 +30,10 @@ def train(model, args, device):
         from data.dataloader_sz import SZLoader
         train_loader = SZLoader(args, 'train').data
         test_loader = SZLoader(args, 'test').data
+    elif args.dataset_name == 'scannet':
+        from data.dataloader_scannet import ScannetLoader
+        train_loader = ScannetLoader(args, 'train').data
+        test_loader = ScannetLoader(args, 'test').data
     else:
         raise Exception('invalid dataset name')
 
@@ -42,8 +46,8 @@ def train(model, args, device):
         params = model.parameters()
     else:
         print("Using diff LR")
-        params = [{"params": model.get_1x_lr_params(), "lr": args.lr / 10},
-                  {"params": model.get_10x_lr_params(), "lr": args.lr}]
+        params = [{"params": model.get_encoder_params(), "lr": args.lr / 10},
+                  {"params": model.get_decoder_params(), "lr": args.lr}]
     optimizer = optim.AdamW(params, weight_decay=args.weight_decay, lr=args.lr)
 
     # learning rate scheduler
@@ -109,7 +113,8 @@ def train(model, args, device):
                 torch.save({"model": model.state_dict(),
                             "iter": total_iter}, target_path)
                 print(f'model saved / path: {target_path}')
-                validate(model, args, test_loader, device, total_iter, args.eval_acc_txt)
+                mean_error = validate(model, args, test_loader, device, total_iter, args.eval_acc_txt)['mean']
+                writer.add_scalar('val/mean_normal_error', mean_error, global_step=total_iter)
                 model.train()
 
                 # empty cache
@@ -192,8 +197,8 @@ if __name__ == '__main__':
     # training
     parser.add_argument('--n_epochs', default=5, type=int, help='number of total epochs to run')
     parser.add_argument('--batch_size', default=4, type=int)
-    parser.add_argument('--validate_every', default=100, type=int, help='validation period')
-    parser.add_argument('--visualize_every', default=20, type=int, help='visualization period')
+    parser.add_argument('--validate_every', default=1000, type=int, help='validation period')
+    parser.add_argument('--visualize_every', default=100, type=int, help='visualization period')
     # parser.add_argument("--distributed", default=False, action="store_true", help="Use DDP if set")
     # parser.add_argument("--workers", default=12, type=int, help="Number of workers for data loading")
 
@@ -206,7 +211,7 @@ if __name__ == '__main__':
     parser.add_argument('--final_div_factor', default=10000.0, type=float, help="final div factor for lr")
 
     # dataset
-    parser.add_argument("--dataset_name", default='sz', type=str, help="{sz, nyu}")
+    parser.add_argument("--dataset_name", type=str, help="{sz, scannet, nyu}", required=True)
 
     # dataset - preprocessing
     parser.add_argument('--input_height', default=480, type=int)
@@ -216,6 +221,7 @@ if __name__ == '__main__':
     parser.add_argument("--data_augmentation_color", default=True, action="store_true")
     parser.add_argument("--data_augmentation_hflip", default=True, action="store_true")
     parser.add_argument("--data_augmentation_random_crop", default=False, action="store_true")
+    parser.add_argument('--use_clahe', default=False, action='store_true')
 
     # read arguments from txt file
     if sys.argv.__len__() == 2 and '.txt' in sys.argv[1]:

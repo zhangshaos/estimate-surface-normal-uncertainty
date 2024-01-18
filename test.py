@@ -9,7 +9,7 @@ import torch.nn.functional as F
 
 from data.dataloader_sz import SZLoader
 from models.NNET import NNET
-import utils.utils as utils
+import mainly_utils.utils as utils
 
 import matplotlib
 matplotlib.use('Agg')
@@ -68,6 +68,7 @@ if __name__ == '__main__':
     parser.add_argument('--input_height', default=480, type=int)
     parser.add_argument('--input_width', default=640, type=int)
     parser.add_argument('--imgs_dir', required=True, type=str)
+    parser.add_argument('--use_clahe', default=False, type=bool)
 
     # read arguments from txt file
     if sys.argv.__len__() == 2 and '.txt' in sys.argv[1]:
@@ -77,6 +78,7 @@ if __name__ == '__main__':
         args = parser.parse_args()
 
     device = torch.device('cuda:0')
+    # device = torch.device('cpu')
 
     # load checkpoint
     checkpoint = args.pretrained

@@ -13,7 +13,7 @@ import onnxruntime as ort
 
 from data.dataloader_sz import SZLoader
 from models.NNET import NNET
-import utils.utils as utils
+import mainly_utils.utils as utils
 
 import matplotlib
 matplotlib.use('Agg')
@@ -81,6 +81,7 @@ if __name__ == '__main__':
     parser.add_argument('--input_height', default=480, type=int)
     parser.add_argument('--input_width', default=640, type=int)
     parser.add_argument('--imgs_dir', required=True, type=str)
+    parser.add_argument('--use_clahe', default=False, action="store_true")
     parser.add_argument('--export_onnx', default=False, action="store_true")
 
     # read arguments from txt file
@@ -90,44 +91,46 @@ if __name__ == '__main__':
     else:
         args = parser.parse_args()
 
-    device = torch.device('cuda:0')
-
     # 导出为onnx模型
-    if args.export_onnx:
+    export_onnx = args.export_onnx
+    export_onnx = False
+    if export_onnx:
         # load checkpoint
         checkpoint = args.pretrained
         print(f'loading checkpoint... {checkpoint}')
-        model = NNET(args).to(device)
+        model = NNET(args)
         model = utils.load_checkpoint(checkpoint, model)
-        model.eval()
-        print('loading checkpoint... / done')
-        print(f'export onnx model...')
-        x = torch.randn(1, 3, 480, 640, device=device)
-        model(x) #预热
-        t0 = time.time_ns()
-        out_list, _, _ = model(x)
-        t1 = time.time_ns()
-        print(f'pytorch inference cost time: {(t1 - t0) * 1e-6} ms.')
-        norm_out = out_list[-1].detach().cpu().numpy()
-        torch.onnx.export(model,
-                          x,
-                          'nnet.onnx',
-                          verbose=False,
-                          input_names=['input'],
-                          output_names=[f'output{i}' for i in range(12)])
-        time.sleep(1)
-        print(f'export onnx model... / done')
-        #Q：Why is the model graph not optimized even with graph_optimization_level set to ORT_ENABLE_ALL?
-        #A：https://onnxruntime.ai/docs/performance/tune-performance/troubleshooting.html
-        remove_initializer_from_input('nnet.onnx')
-        time.sleep(1)
+        with torch.no_grad():
+            model.eval()
+            print('loading checkpoint... / done')
+            print(f'export onnx model...')
+            x = torch.randn(1, 3, 480, 640)
+            model(x) #预热
+            t0 = time.time_ns()
+            out_list, _, _ = model(x)
+            t1 = time.time_ns()
+            print(f'pytorch inference cost time: {(t1 - t0) * 1e-6} ms.')
+            norm_out = out_list[-1].numpy()
+            onnx_model_name = 'nnet.onnx'
+            torch.onnx.export(model,
+                              x,
+                              onnx_model_name,
+                              verbose=False,
+                              input_names=['input'],
+                              output_names=[f'output{i}' for i in range(12)])
+            time.sleep(1)
+            print(f'export onnx model... / done')
+            #Q：Why is the model graph not optimized even with graph_optimization_level set to ORT_ENABLE_ALL?
+            #A：https://onnxruntime.ai/docs/performance/tune-performance/troubleshooting.html
+            #remove_initializer_from_input(onnx_model_name)
+            #time.sleep(1)
         #测试1
-        onnx_nnet = onnx.load('nnet.onnx')
+        onnx_nnet = onnx.load(onnx_model_name)
         onnx.checker.check_model(onnx_nnet)
         #测试2
         print(f'onnx runtime device: {ort.get_device()}')
-        ort_session = ort.InferenceSession('nnet.onnx')
-        ort_inputs = {'input': x.detach().cpu().numpy()}
+        ort_session = ort.InferenceSession(onnx_model_name)
+        ort_inputs = {'input': x.numpy()}
         ort_session.run(None, ort_inputs) #预热
         t0 = time.time_ns()
         ort_outs = ort_session.run(None, ort_inputs)
@@ -135,10 +138,11 @@ if __name__ == '__main__':
         print(f'onnx inference cost time: {(t1-t0)*1e-6} ms.')
         ort_norm_out = ort_outs[3]
         diff = np.abs(norm_out - ort_norm_out).sum()
-        print(f'difference is {diff}.')
+        print(f'difference is {diff}, mean is {diff / norm_out.size}.')
     else:
-        if not os.path.exists('nnet.onnx'):
-            print(f'Not found `nnet.onnx`. Use --export_onnx to export `nnet.onnx` first.')
+        onnx_model_name = 'nnet.onnx'
+        if not os.path.exists(onnx_model_name):
+            print(f'Not found `{onnx_model_name}`. Use --export_onnx to export `{onnx_model_name}` first.')
             exit(1)
         #测试集选择一张图片进行测试
         results_dir = f'{args.imgs_dir}/results'
@@ -152,8 +156,8 @@ if __name__ == '__main__':
         opt = ort.SessionOptions()
         #opt.enable_profiling = True
         opt.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        #opt.optimized_model_filepath = f'optmized_nnet.onnx'
-        ort_session = ort.InferenceSession('nnet.onnx', opt)
+        #opt.optimized_model_filepath = f'optmized_{onnx_model_name}'
+        ort_session = ort.InferenceSession(onnx_model_name, opt)
         ort_input = {'input': img.numpy()}
         t0 = time.time_ns()
         ort_outs = ort_session.run(None, ort_input)

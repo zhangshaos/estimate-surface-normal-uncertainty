@@ -125,6 +125,7 @@ class NyuLoadPreprocess(Dataset):
 
         # to tensors
         img = self.normalize(torch.from_numpy(img).permute(2, 0, 1))            # (3, H, W)
+        norm_gt = data_utils.norm_normalize(norm_gt)
         norm_gt = torch.from_numpy(norm_gt).permute(2, 0, 1)                    # (3, H, W)
         norm_valid_mask = torch.from_numpy(norm_valid_mask).permute(2, 0, 1)    # (1, H, W)
 

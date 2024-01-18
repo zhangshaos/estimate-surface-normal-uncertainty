@@ -51,8 +51,7 @@ class Conv2d(nn.Conv2d):
 
     def forward(self, x):
         weight = self.weight
-        weight_mean = weight.mean(dim=1, keepdim=True).mean(dim=2,
-                                  keepdim=True).mean(dim=3, keepdim=True)
+        weight_mean = weight.mean(dim=1, keepdim=True).mean(dim=2, keepdim=True).mean(dim=3, keepdim=True)
         weight = weight - weight_mean
         std = weight.view(weight.size(0), -1).std(dim=1).view(-1, 1, 1, 1) + 1e-5
         weight = weight / std.expand_as(weight)
@@ -62,6 +61,7 @@ class Conv2d(nn.Conv2d):
 
 # normalize
 def norm_normalize(norm_out):
+    """norm_out shape is (?,4,...)"""
     min_kappa = 0.01
     norm_x, norm_y, norm_z, kappa = torch.split(norm_out, 1, dim=1)
     norm = torch.sqrt(norm_x ** 2.0 + norm_y ** 2.0 + norm_z ** 2.0) + 1e-10

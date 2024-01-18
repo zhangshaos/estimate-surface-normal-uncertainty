@@ -159,11 +159,11 @@ def visualize(args, img, gt_norm, gt_norm_mask, norm_out_list, total_iter):
 
     # input image
     target_path = '%s/%08d_img.jpg' % (args.exp_vis_dir, total_iter)
-    img = unnormalize(img[0, ...])
-    plt.imsave(target_path, img)
+    plt.imsave(target_path, img[0,...])
 
     # gt norm
-    gt_norm_rgb = ((gt_norm[0, ...] + 1) * 0.5) * 255
+    gt_norm_rgb = gt_norm[0, ...]
+    gt_norm_rgb = ((gt_norm_rgb + 1) * 0.5) * 255
     gt_norm_rgb = np.clip(gt_norm_rgb, a_min=0, a_max=255)
     gt_norm_rgb = gt_norm_rgb.astype(np.uint8)
 

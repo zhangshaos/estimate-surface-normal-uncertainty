@@ -1,10 +1,9 @@
-import os
-import sys
-import shutil
 import random
 import numpy as np
 from PIL import Image
-import cv2
+import os
+import shutil
+import sys
 
 import torch
 import torch.utils.data.distributed
@@ -15,15 +14,15 @@ import matplotlib.pyplot as plt
 
 
 # Modify the following
-SZ_PATH = f'{os.path.dirname(__file__)}/../data_split'
+SCANNET_PATH = 'E:/datasets/scannet/data'
 
 
-class SZLoader(object):
+class ScannetLoader(object):
     def __init__(self, args, mode):
         """mode: {'train',      # train set
                   'test'}       # test set
         """
-        self.t_samples = SZDataset(args, mode)
+        self.t_samples = ScannetDataset(args, mode)
 
         # train, test
         if 'train' in mode:
@@ -42,25 +41,25 @@ class SZLoader(object):
                                    pin_memory=False)
 
 
-class SZDataset(Dataset):
+class ScannetDataset(Dataset):
     def __init__(self, args, mode):
         self.args = args
         self.filenames = []
         i = 0
         while True:
-            name = f'{SZ_PATH}/{mode}/{i}_scene.png'
+            name = f'{SCANNET_PATH}/{mode}/{i}_scene.png'
             if not os.path.exists(name):
                 break
             self.filenames.append(name)
             i += 1
-        print(f'SZDataset load {i} images.')
+        print(f'ScannetDataset load {i} images.')
         self.mode = mode
         if args.use_clahe:
             # 使用clahe图像增强算法保证图像白平衡
             self.clahe = data_utils.clahe_process()
         else:
             self.clahe = None
-        self.dataset_path = f'{SZ_PATH}/{mode}'
+        self.dataset_path = f'{SCANNET_PATH}/{mode}'
         self.input_height = args.input_height
         self.input_width = args.input_width
 
@@ -71,7 +70,6 @@ class SZDataset(Dataset):
         # img path and norm path
         img_path = self.filenames[idx]
         norm_path = f'{self.dataset_path}/{idx}_normal.png'
-        mask_path = f'{self.dataset_path}/{idx}_mask.png'
         mode_name = self.mode
 
         # read img / normal
@@ -87,29 +85,18 @@ class SZDataset(Dataset):
                 size=(self.input_width, self.input_height),
                 resample=Image.NEAREST,
                 reducing_gap=4.0)
-        norm_valid_mask = Image.open(mask_path).convert('L')
-        if norm_valid_mask.width != self.input_width \
-            or norm_valid_mask.height != self.input_height:
-            norm_valid_mask = norm_valid_mask.resize(
-                size=(self.input_width, self.input_height),
-                resample=Image.NEAREST,
-                reducing_gap=4.0)
 
         # to array
-        img = np.array(img, dtype=np.uint8)
         if self.clahe is not None:
+            img = np.array(img, np.uint8)
             img = self.clahe(img)
-        img = img.astype(np.float32) / 255.0
-        # SZ数据集中，法向量使用 前x，右y，上z 左手坐标系（来自UE4）
+            img = img.astype(np.float32) / 255.0
+        else:
+            img = np.array(img).astype(np.float32) / 255.0
         norm_gt = np.array(norm_gt).astype(np.uint8)
         norm_gt = ((norm_gt.astype(np.float32) / 255.0) * 2.0) - 1.0
-        norm_valid_mask = np.array(norm_valid_mask).astype(np.uint8)
-        # 排除天空(0)和地面(1)，使用膨胀操作对边缘进行扩张
-        valid_mask = (norm_valid_mask > 1).astype(np.uint8)
-        valid_mask = cv2.dilate(valid_mask, np.ones((5, 5), dtype=np.uint8), iterations=1)
-        # 由于对遮罩使用膨胀操作，因此可能访问的天空的法向量，因此将天空的法向量设置为(1,0,0)
-        norm_gt[norm_valid_mask <= 0] = (1.0, 0.0, 0.0)
-        norm_valid_mask = valid_mask[:, :, np.newaxis].astype(np.bool_)
+        norm_valid_mask = (np.abs(norm_gt).sum(-1) >= 0.5)
+        norm_valid_mask = norm_valid_mask[:, :, np.newaxis]
 
         if 'train' in self.mode:
             # horizontal flip (default: True)
@@ -134,14 +121,13 @@ class SZDataset(Dataset):
                     img = data_utils.color_augmentation(img, indoors=False)
 
         # to tensors
-        img = torch.from_numpy(img.copy()).permute(2, 0, 1)         # (3, H, W)
+        img = torch.from_numpy(img.copy()).permute(2, 0, 1)                            # (3, H, W)
         norm_gt = data_utils.norm_normalize(norm_gt)
-        norm_gt = torch.from_numpy(norm_gt.copy()).permute(2, 0, 1) # (3, H, W)
-        norm_valid_mask = torch.from_numpy(
-            norm_valid_mask.copy()).permute(2, 0, 1)                # (1, H, W)
+        norm_gt = torch.from_numpy(norm_gt.copy()).permute(2, 0, 1)                    # (3, H, W)
+        norm_valid_mask = torch.from_numpy(norm_valid_mask.copy()).permute(2, 0, 1)    # (1, H, W)
 
         # 预训练模型使用 左x，上y，后z 左手坐标系
-        norm_gt = torch.stack((-norm_gt[1,:,:], norm_gt[2,:,:], -norm_gt[0,:,:]), dim=0)
+        norm_gt = norm_gt * -1
 
         sample = {'img': img,
                   'norm': norm_gt,
@@ -152,37 +138,43 @@ class SZDataset(Dataset):
         return sample
 
 
-# 图片预处理：放缩图片、并将图片复制到指定目录下
+# 数据预处理：放缩图片、并将图片复制到指定目录下，并构建数据集
 def preprocess(srcDir: str, destDir: str, width=640, height=480):
     assert os.path.exists(srcDir)
-    if os.path.exists(destDir):
-        shutil.rmtree(destDir, ignore_errors=True)
-    os.makedirs(destDir)
-    cameraFile = f'{srcDir}/cameras.txt'
-    if os.path.exists(cameraFile):
-        shutil.copy(cameraFile, destDir)
-    i = 0
-    while True:
-        scene   = f'{srcDir}/{i}_scene.png'
-        normal = f'{srcDir}/{i}_normal.png'
-        mask   = f'{srcDir}/{i}_mask.png'
-        seg    = f'{srcDir}/{i}_seg.png'
-        if not os.path.exists(scene):
-            break
-        Image.open(scene).convert('RGB') \
-            .resize((width, height), Image.LANCZOS, reducing_gap=4.0) \
-            .save(f'{destDir}/{i}_scene.png')
-        Image.open(normal).convert('RGB') \
-            .resize((width, height), Image.NEAREST, reducing_gap=4.0) \
-            .save(f'{destDir}/{i}_normal.png')
-        Image.open(mask).convert('L') \
-            .resize((width, height), Image.NEAREST, reducing_gap=4.0) \
-            .save(f'{destDir}/{i}_mask.png')
-        Image.open(seg).convert('RGB') \
-            .resize((width, height), Image.NEAREST, reducing_gap=4.0) \
-            .save(f'{destDir}/{i}_seg.png')
-        i += 1
-    print(f'\nHandled {i} pictures...\n')
+    dst_train_dir, dst_test_dir = f'{destDir}/train', f'{destDir}/test'
+    if os.path.exists(dst_train_dir):
+        shutil.rmtree(dst_train_dir, ignore_errors=True)
+    os.makedirs(dst_train_dir)
+    if os.path.exists(dst_test_dir):
+        shutil.rmtree(dst_test_dir, ignore_errors=True)
+    os.makedirs(dst_test_dir)
+    train_i = 0
+    test_i = 0
+    for cur_dir, dirs, files in os.walk(srcDir):
+        for f in files:
+            if 'color' not in f:
+                continue
+            color_file: str = f'{cur_dir}/{f}'
+            normal_file: str = color_file.replace('color', 'normal')
+            if not os.path.exists(normal_file):
+                continue
+            scene = Image.open(color_file).convert('RGB')
+            if scene.height != height or scene.width != width:
+                scene = scene.resize((width, height), Image.LANCZOS, reducing_gap=4.0)
+            normal = Image.open(normal_file).convert('RGB')
+            if normal.height != height or normal.width != width:
+                normal = normal.resize((width, height), Image.NEAREST, reducing_gap=4.0)
+            # 80%的图片作为训练集，20%作为测试集
+            if random.random() > 0.2:
+                scene.save(f'{dst_train_dir}/{train_i}_scene.png')
+                normal.save(f'{dst_train_dir}/{train_i}_normal.png')
+                train_i += 1
+            else:
+                scene.save(f'{dst_test_dir}/{test_i}_scene.png')
+                normal.save(f'{dst_test_dir}/{test_i}_normal.png')
+                test_i += 1
+    print(f'\nHandled {train_i + test_i} pictures...\n'
+          f'train={train_i}; test={test_i}\n')
 
 
 if __name__ == '__main__':
@@ -191,18 +183,18 @@ if __name__ == '__main__':
     cmd = sys.argv[1]
     if cmd == 'moveDataset':
         preprocess(
-            r'E:\Py_Projects\VCCPlaneRecon\datasets\generator\raw_data',
-            r'..\data_split\train')
+            r'E:\datasets\scannet\scannet-frames',
+            r'E:\datasets\scannet\data')
     elif cmd == 'testDataLoad':
         class Args:
             def __init__(self):
                 self.input_width=640
                 self.input_height=480
-                self.data_augmentation_hflip = False
+                self.data_augmentation_hflip = True
                 self.data_augmentation_random_crop = False
-                self.data_augmentation_color = False
+                self.data_augmentation_color = True
                 self.use_clahe = False
-        dataSet = SZDataset(Args(), 'test')
+        dataSet = ScannetDataset(Args(), 'train')
         for i, dat in enumerate(dataSet):
             # {'img'            : img,
             #  'norm'           : norm_gt,
@@ -213,7 +205,6 @@ if __name__ == '__main__':
             norm = dat['norm'].permute(1,2,0).numpy()
             mask = dat['norm_valid_mask'].permute(1,2,0).numpy()
 
-            img = (img * 255).astype(np.uint8)
             norm = ((norm + 1) * 0.5) * 255
             norm = np.clip(norm, a_min=0, a_max=255)
             norm = norm.astype(np.uint8)  # (B, H, W, 3)

@@ -7,10 +7,13 @@ checkpoints/
 examples/
 data_split/**
 experiments/
+runs/
 
 t_img.png
 t_norm.png
 t_mask.png
+norm.png
 *.pt
 *.onnx
 onnxruntime_profile_*
+t.py
