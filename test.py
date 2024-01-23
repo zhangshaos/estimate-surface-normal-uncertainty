@@ -91,5 +91,8 @@ if __name__ == '__main__':
     params.input_height = args.input_height
     params.input_width = args.input_width
     params.data_record_file = f'./data_split/data.txt'
+    params.need_scene = True
+    params.need_normal = False
+    params.need_depth = False
     test_loader = VCC_Loader(params).data
     test(model, test_loader, device, results_dir)

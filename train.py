@@ -37,6 +37,9 @@ def train(model, args, device):
         params.data_augmentation_hflip = args.data_augmentation_hflip
         params.data_augmentation_random_crop = args.data_augmentation_random_crop
         params.data_record_file = f'./data_split/data.txt'
+        params.need_scene = True
+        params.need_normal = True
+        params.need_depth = False
         train_loader = VCC_Loader(params).data
         params.mode = 'test'
         test_loader = VCC_Loader(params).data
