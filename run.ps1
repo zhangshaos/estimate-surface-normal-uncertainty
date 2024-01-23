@@ -1,0 +1,1 @@
+python run.py --pretrained experiments/exp01/models/checkpoint_iter_0000071760_loss_-7.674011.pt --architecture BN --input_data_file data_split/data_oblique.txt --output_dir results/oblique
