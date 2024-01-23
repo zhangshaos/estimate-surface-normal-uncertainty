@@ -1,9 +1,11 @@
 import time
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from models.submodules.submodules import UpSampleBN, UpSampleGN, norm_normalize, sample_points
+
+
+DEBUG = False
 
 
 class Decoder(nn.Module):
@@ -61,7 +63,8 @@ class Decoder(nn.Module):
     def forward(self, features, gt_norm_mask=None, mode='test'):
         x_block0, x_block1, x_block2, x_block3, x_block4 = features[4], features[5], features[6], features[8], features[11]
 
-        t0 = time.time_ns()
+        if DEBUG:
+            t0 = time.time_ns()
 
         # generate feature-map
 
@@ -200,8 +203,9 @@ class Decoder(nn.Module):
             out_res1 = out_res1.view(B, 4, H, W)
             samples_pred_res1 = point_coords_res1 = torch.empty(0) #None
 
-        t1 = time.time_ns()
-        print(f'decoder cost {(t1 - t0) * 1e-6} millisecond.')
+        if DEBUG:
+            t1 = time.time_ns()
+            print(f'decoder cost {(t1 - t0) * 1e-6} millisecond.')
 
         return (out_res8, out_res4, out_res2, out_res1), \
                (out_res8, samples_pred_res4, samples_pred_res2, samples_pred_res1), \

@@ -1,5 +1,4 @@
 import argparse
-import os
 import sys
 import numpy as np
 from tqdm import tqdm
@@ -11,8 +10,8 @@ import torch.optim as optim
 import torch.utils.data.distributed
 from torch.utils.tensorboard import SummaryWriter
 
-import utils.utils as utils
-from utils.losses import compute_loss
+import funcs.utils as utils
+from funcs.losses import compute_loss
 
 
 def train(model, args, device):
@@ -26,10 +25,21 @@ def train(model, args, device):
         from data.dataloader_nyu import NyuLoader
         train_loader = NyuLoader(args, 'train').data
         test_loader = NyuLoader(args, 'test').data
-    elif args.dataset_name == 'sz':
-        from data.dataloader_sz import SZLoader
-        train_loader = SZLoader(args, 'train').data
-        test_loader = SZLoader(args, 'test').data
+    elif args.dataset_name == 'vcc':
+        from data.dataloader_vcc import VCC_Loader, VCC_DatasetParams
+        params = VCC_DatasetParams()
+        params.mode = 'train'
+        params.input_height = args.input_height
+        params.input_width = args.input_width
+        params.batch_size = args.batch_size
+        params.num_threads = args.workers
+        params.data_augmentation_color = args.data_augmentation_color
+        params.data_augmentation_hflip = args.data_augmentation_hflip
+        params.data_augmentation_random_crop = args.data_augmentation_random_crop
+        params.data_record_file = f'./data_split/data.txt'
+        train_loader = VCC_Loader(params).data
+        params.mode = 'test'
+        test_loader = VCC_Loader(params).data
     else:
         raise Exception('invalid dataset name')
 
@@ -109,11 +119,11 @@ def train(model, args, device):
                 torch.save({"model": model.state_dict(),
                             "iter": total_iter}, target_path)
                 print(f'model saved / path: {target_path}')
-                validate(model, args, test_loader, device, total_iter, args.eval_acc_txt)
+                # validate(model, args, test_loader, device, total_iter, args.eval_acc_txt)
                 model.train()
 
                 # empty cache
-                torch.cuda.empty_cache()
+                # torch.cuda.empty_cache()
 
     # save last model
     model.eval()
@@ -121,10 +131,10 @@ def train(model, args, device):
     torch.save({"model": model.state_dict(),
                 "iter" : total_iter}, target_path)
     print(f'model saved / path: {target_path}')
-    validate(model, args, test_loader, device, total_iter, args.eval_acc_txt)
+    # validate(model, args, test_loader, device, total_iter, args.eval_acc_txt)
 
     # empty cache
-    torch.cuda.empty_cache()
+    # torch.cuda.empty_cache()
 
     return model
 
@@ -161,6 +171,7 @@ def validate(model, args, test_loader, device, total_iter, where_to_write, vis_d
             if total_normal_errors is None:
                 total_normal_errors = E[mask]
             else:
+                # fixme 此处爆显存，total_normal_errors 太长了
                 total_normal_errors = torch.cat((total_normal_errors, E[mask]), dim=0)
 
         total_normal_errors = total_normal_errors.data.cpu().numpy()
@@ -180,7 +191,7 @@ if __name__ == '__main__':
     parser.add_argument('--visible_gpus', default='01', type=str, help='gpu to use')
 
     # model architecture
-    parser.add_argument("--pretrained", default='none', type=str, help="{nyu, scannet, sz}")
+    parser.add_argument("--pretrained", default='none', type=str, help="{nyu, scannet, vcc}")
     parser.add_argument('--architecture', default='GN', type=str, help='{BN, GN}')
     parser.add_argument("--use_baseline", action="store_true", help='use baseline encoder-decoder (no pixel-wise MLP, no uncertainty-guided sampling')
     parser.add_argument('--sampling_ratio', default=0.4, type=float)
@@ -192,10 +203,10 @@ if __name__ == '__main__':
     # training
     parser.add_argument('--n_epochs', default=5, type=int, help='number of total epochs to run')
     parser.add_argument('--batch_size', default=4, type=int)
-    parser.add_argument('--validate_every', default=100, type=int, help='validation period')
-    parser.add_argument('--visualize_every', default=20, type=int, help='visualization period')
+    parser.add_argument('--validate_every', default=5000, type=int, help='validation period')
+    parser.add_argument('--visualize_every', default=1000, type=int, help='visualization period')
     # parser.add_argument("--distributed", default=False, action="store_true", help="Use DDP if set")
-    # parser.add_argument("--workers", default=12, type=int, help="Number of workers for data loading")
+    parser.add_argument("--workers", default=12, type=int, help="Number of workers for data loading")
 
     # optimizer setup
     parser.add_argument('--weight_decay', default=0.01, type=float, help='weight decay')
@@ -206,7 +217,7 @@ if __name__ == '__main__':
     parser.add_argument('--final_div_factor', default=10000.0, type=float, help="final div factor for lr")
 
     # dataset
-    parser.add_argument("--dataset_name", default='sz', type=str, help="{sz, nyu}")
+    parser.add_argument("--dataset_name", default='vcc', type=str, help="{vcc, nyu}")
 
     # dataset - preprocessing
     parser.add_argument('--input_height', default=480, type=int)
@@ -251,7 +262,7 @@ if __name__ == '__main__':
 
     # load checkpoint
     if args.pretrained != 'none':
-        checkpoint = f'./checkpoints/{args.pretrained}.pt'
+        checkpoint = args.pretrained
         print(f'loading checkpoint... {checkpoint}')
         model = utils.load_checkpoint(checkpoint, model)
         print('loading checkpoint... / done')

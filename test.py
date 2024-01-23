@@ -3,18 +3,16 @@ import os
 import sys
 import numpy as np
 from tqdm import tqdm
-
 import torch
-import torch.nn.functional as F
 
-from data.dataloader_sz import SZLoader
+from data.dataloader_vcc import VCC_Loader, VCC_DatasetParams
 from models.NNET import NNET
-import utils.utils as utils
+import funcs.utils as utils
 
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from PIL import Image
+import matplotlib
+matplotlib.use('Agg')
 
 
 def test(model, test_loader, device, results_dir):
@@ -22,7 +20,6 @@ def test(model, test_loader, device, results_dir):
 
     with torch.no_grad():
         for data_dict in tqdm(test_loader):
-
             img = data_dict['img'].to(device)
             norm_out_list, _, _ = model(img)
             norm_out = norm_out_list[-1]
@@ -30,11 +27,11 @@ def test(model, test_loader, device, results_dir):
             pred_kappa = norm_out[:, 3:, :, :]
 
             # to numpy arrays
-            pred_norm = pred_norm.detach().cpu().permute(0, 2, 3, 1).numpy()        # (B, H, W, 3)
+            pred_norm = pred_norm.detach().cpu().permute(0, 2, 3, 1).numpy()  # (B, H, W, 3)
             pred_kappa = pred_kappa.cpu().permute(0, 2, 3, 1).numpy()
 
             # save results
-            img_name = os.path.basename(data_dict['img_name'][0]).replace('.png','')
+            img_name = os.path.basename(data_dict['img_name'][0]).replace('.png', '')
 
             # 2. predicted normal
             # 模型使用左x，上y，后z左手坐标系，将其转换为右x，下y，前z相机坐标系
@@ -52,12 +49,12 @@ def test(model, test_loader, device, results_dir):
             pred_alpha_gray = (pred_alpha * (255 / 90)).astype(np.uint8)
 
             target_path = f'{results_dir}/{img_name}_pred_alpha.png'
-            #plt.imsave(target_path, pred_alpha_gray[0, :, :, 0], cmap='gray')
+            # plt.imsave(target_path, pred_alpha_gray[0, :, :, 0], cmap='gray')
             Image.fromarray(pred_alpha_gray[0, :, :, 0]).save(target_path)
 
 
 if __name__ == '__main__':
-    # Arguments ########################################################################################################
+    # Arguments #################################################################################
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@', conflict_handler='resolve')
     parser.convert_arg_line_to_args = utils.convert_arg_line_to_args
 
@@ -67,7 +64,7 @@ if __name__ == '__main__':
     parser.add_argument('--importance_ratio', type=float, default=0.7)
     parser.add_argument('--input_height', default=480, type=int)
     parser.add_argument('--input_width', default=640, type=int)
-    parser.add_argument('--imgs_dir', required=True, type=str)
+    parser.add_argument('--result_dir', type=str, default='results')
 
     # read arguments from txt file
     if sys.argv.__len__() == 2 and '.txt' in sys.argv[1]:
@@ -87,8 +84,12 @@ if __name__ == '__main__':
     print('loading checkpoint... / done')
 
     # test the model
-    results_dir = f'{args.imgs_dir}/results'
+    results_dir = f'{args.result_dir}/results'
     os.makedirs(results_dir, exist_ok=True)
-    test_loader = SZLoader(args, 'test').data
+    params = VCC_DatasetParams()
+    params.mode = 'test'
+    params.input_height = args.input_height
+    params.input_width = args.input_width
+    params.data_record_file = f'./data_split/data.txt'
+    test_loader = VCC_Loader(params).data
     test(model, test_loader, device, results_dir)
-

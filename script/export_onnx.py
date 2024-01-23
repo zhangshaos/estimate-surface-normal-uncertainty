@@ -3,22 +3,18 @@ import os
 import sys
 import time
 import numpy as np
-from tqdm import tqdm
-
-import torch
-import torch.nn.functional as F
 import torch.onnx
 import onnx
 import onnxruntime as ort
 
-from data.dataloader_sz import SZLoader
+from data.dataloader_vcc import VCC_Loader
 from models.NNET import NNET
-import utils.utils as utils
+import funcs.utils as utils
 
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from PIL import Image
+import matplotlib
+matplotlib.use('Agg')
 
 
 def save_normal_result(norm_out: np.ndarray, result_dir: str, img_base_name: str):
@@ -143,7 +139,7 @@ if __name__ == '__main__':
         #测试集选择一张图片进行测试
         results_dir = f'{args.imgs_dir}/results'
         os.makedirs(results_dir, exist_ok=True)
-        test_loader = SZLoader(args, 'test').data
+        test_loader = VCC_Loader(args, 'test').data
         test_data = next(iter(test_loader))
         img = test_data['img']
         img_name = test_data['img_name'][0]

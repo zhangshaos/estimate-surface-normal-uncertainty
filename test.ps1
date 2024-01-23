@@ -1,0 +1,1 @@
+python test.py --pretrained experiments/exp01/models/checkpoint_iter_0000071760_loss_-7.674011.pt --architecture BN

@@ -1,8 +1,10 @@
 import time
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+
+DEBUG = False
 
 
 class Encoder(nn.Module):
@@ -25,15 +27,17 @@ class Encoder(nn.Module):
 
     def forward(self, x):
         features = [x]
-        t0 = time.time_ns()
+        if DEBUG:
+            t0 = time.time_ns()
         for k, v in self.original_model._modules.items():
             if (k == 'blocks'):
                 for ki, vi in v._modules.items():
                     features.append(vi(features[-1]))
             else:
                 features.append(v(features[-1]))
-        t1 = time.time_ns()
-        print(f'encoder cost {(t1 - t0) * 1e-6} millisecond.')
+        if DEBUG:
+            t1 = time.time_ns()
+            print(f'encoder cost {(t1 - t0) * 1e-6} millisecond.')
         return features
 
 

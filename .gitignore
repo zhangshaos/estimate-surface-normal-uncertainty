@@ -3,10 +3,11 @@
 .idea/
 __pycache__/
 
-checkpoints/
+checkpoints/**
 examples/
 data_split/**
-experiments/
+experiments/**
+results/
 
 t_img.png
 t_norm.png
