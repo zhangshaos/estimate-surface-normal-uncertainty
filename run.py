@@ -15,9 +15,12 @@ import funcs.utils as utils
 def run(model, test_loader, device, output_dir):
     alpha_max = 90
     i = 0
+    output_dir = os.path.abspath(output_dir)
+    f = open(f'{output_dir}/estimate_normal.txt', 'wt')
     with torch.no_grad():
         for data_dict in tqdm(test_loader):
-            name = data_dict['img_name']
+            name = data_dict['img_name'][0]
+            f.write(f'{name} ')
             img = data_dict['img'].to(device)
             norm_out_list, _, _ = model(img)
             norm_out = norm_out_list[-1]
@@ -37,12 +40,14 @@ def run(model, test_loader, device, output_dir):
             pred_norm_tiff = pred_norm[0, :, :, :].astype(np.float32)
             target_path = f'{output_dir}/{i}_{img_name}_pred_norm.tiff'
             imageio.imwrite(target_path, pred_norm_tiff)
+            f.write(f'{target_path} ')
 
             pred_norm_rgb = ((pred_norm + 1) * 0.5) * 255
             pred_norm_rgb = np.clip(pred_norm_rgb, a_min=0, a_max=255)
             pred_norm_rgb = pred_norm_rgb.astype(np.uint8)  # (B, H, W, 3)
             target_path = f'{output_dir}/{i}_{img_name}_pred_norm_vis.png'
             Image.fromarray(pred_norm_rgb[0, :, :, :]).save(target_path)
+            # f.write(f'{target_path} ')
 
             # 4. predicted uncertainty
             pred_alpha = utils.kappa_to_alpha(pred_kappa)  # (B, H, W, 1)
@@ -50,10 +55,13 @@ def run(model, test_loader, device, output_dir):
             pred_alpha_gray = (pred_alpha * (255 / 90)).astype(np.uint8)
             target_path = f'{output_dir}/{i}_{img_name}_pred_alpha.png'
             Image.fromarray(pred_alpha_gray[0, :, :, 0]).save(target_path)
-
+            # f.write(f'{target_path} ')
+            f.write('\n')
+            f.flush()
             # print(f'\nhandle {name}.\n')
             i += 1
     print(f'\nhandle {i} images.\n')
+    f.close()
 
 
 if __name__ == '__main__':

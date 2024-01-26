@@ -28,6 +28,8 @@ test.py 默认只测试训练测试集，如果想要测试自定义数据，请
 python run.py --pretrained [path to model weights] --architecture BN --input_data_file [path to data.txt] --output_dir [path to store results]
 ```
 
+之后，在output_dir/estimate_normal.txt中，记录每张RGB图片和法向量预测图片的绝对路径。
+
 ## 导出onnx模型
 
 `python export_onnx.py --pretrained [path to model weights] --architecture BN --imgs_dir [path to test data] --export_onnx`
@@ -139,6 +141,6 @@ If you find our work useful in your research please consider citing our paper:
     title   = {Estimating and Exploiting the Aleatoric Uncertainty in Surface Normal Estimation}
     author  = {Gwangbin Bae and Ignas Budvytis and Roberto Cipolla},
     booktitle = {International Conference on Computer Vision (ICCV)},
-    year = {2021}                   
+    year = {2021}                 
 }
 ```
