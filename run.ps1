@@ -1,1 +1,1 @@
-python run.py --pretrained experiments/exp01/models/checkpoint_iter_0000071760_loss_-7.674011.pt --architecture BN --input_data_file data_split/data_oblique.txt --output_dir results/oblique
+python run.py --pretrained checkpoints/scannet.pt --architecture BN --input_data_file E:\datasets\VCC贴图航线采集测试项目\COLMAP稀疏重建\imgs\resized_images\data.txt --output_dir E:\datasets\VCC贴图航线采集测试项目\COLMAP稀疏重建\imgs\resized_images\result

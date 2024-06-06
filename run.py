@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import torch
 import argparse
 import numpy as np
@@ -17,6 +18,7 @@ def run(model, test_loader, device, output_dir):
     i = 0
     output_dir = os.path.abspath(output_dir)
     f = open(f'{output_dir}/estimate_normal.txt', 'wt')
+    t0 = time.time()
     with torch.no_grad():
         for data_dict in tqdm(test_loader):
             name = data_dict['img_name'][0]
@@ -60,7 +62,9 @@ def run(model, test_loader, device, output_dir):
             f.flush()
             # print(f'\nhandle {name}.\n')
             i += 1
+    t1 = time.time()
     print(f'\nhandle {i} images.\n')
+    print(f'cost {t1 - t0} seconds.\n')
     f.close()
 
 
