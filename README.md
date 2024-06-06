@@ -22,7 +22,7 @@ python test.py --pretrained [path to model weights] --architecture BN
 
 ### 测试其他数据
 
-test.py 默认只测试训练测试集，如果想要测试自定义数据，请参考 airsim_simulate 项目将数据打包成 data.txt 格式，然后运行：
+test.py 默认只测试训练测试集，如果想要测试自定义数据，请参考 [airsim_simulate](https://github.com/zhangshaos/airsim_simulator) 项目将数据打包成 data.txt 格式，然后运行：
 
 ```python
 python run.py --pretrained [path to model weights] --architecture BN --input_data_file [path to data.txt] --output_dir [path to store results]
